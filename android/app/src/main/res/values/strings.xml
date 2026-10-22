@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ReelLimit</string>
+    <string name="accessibility_service_label">ReelLimit Reel &amp; Shorts Monitor</string>
+    <string name="accessibility_service_desc">Enables ReelLimit to monitor video swiping on YouTube Shorts, Instagram Reels, and Snapchat Spotlight, provide milestone reminders every 10 reels, and enforce focus limits.</string>
+</resources>

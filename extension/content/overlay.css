@@ -1,0 +1,194 @@
+/* ReelLimit In-Page Overlay & Notifications */
+
+.reellimit-pill-container {
+  position: fixed !important;
+  bottom: 24px !important;
+  right: 24px !important;
+  z-index: 2147483647 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.reellimit-mini-pill {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(99, 102, 241, 0.2) !important;
+  border-radius: 9999px !important;
+  padding: 8px 14px !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, border-color 0.2s ease !important;
+}
+
+.reellimit-mini-pill:hover {
+  transform: translateY(-2px) !important;
+  border-color: rgba(99, 102, 241, 0.6) !important;
+}
+
+.reellimit-pill-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background-color: #10b981 !important;
+  box-shadow: 0 0 8px #10b981 !important;
+}
+
+.reellimit-pill-dot.warning {
+  background-color: #f59e0b !important;
+  box-shadow: 0 0 8px #f59e0b !important;
+}
+
+.reellimit-pill-dot.danger {
+  background-color: #ef4444 !important;
+  box-shadow: 0 0 8px #ef4444 !important;
+}
+
+/* Milestone Toast (Every 10 Reels) */
+.reellimit-milestone-toast {
+  position: fixed !important;
+  top: 30px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-20px) !important;
+  z-index: 2147483647 !important;
+  max-width: 440px !important;
+  width: 90% !important;
+  background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 23, 42, 0.95)) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1.5px solid #818cf8 !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 25px rgba(99, 102, 241, 0.4) !important;
+  border-radius: 16px !important;
+  padding: 18px 22px !important;
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.reellimit-milestone-toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.reellimit-toast-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 8px !important;
+}
+
+.reellimit-toast-title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: #a5b4fc !important;
+}
+
+.reellimit-toast-badge {
+  background: rgba(99, 102, 241, 0.25) !important;
+  color: #c7d2fe !important;
+  padding: 2px 8px !important;
+  border-radius: 9999px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(129, 140, 248, 0.3) !important;
+}
+
+.reellimit-toast-body {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: #e2e8f0 !important;
+  margin-bottom: 14px !important;
+}
+
+.reellimit-toast-actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+}
+
+.reellimit-toast-btn {
+  background: #4f46e5 !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 7px 16px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: background 0.2s ease !important;
+}
+
+.reellimit-toast-btn:hover {
+  background: #4338ca !important;
+}
+
+/* Exit Countdown Modal when limit reached */
+.reellimit-block-screen {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(10, 15, 30, 0.94) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  text-align: center !important;
+  padding: 24px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  animation: reellimit-fade-in 0.3s ease-out forwards !important;
+}
+
+@keyframes reellimit-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.reellimit-block-icon {
+  font-size: 54px !important;
+  margin-bottom: 16px !important;
+  filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.6)) !important;
+}
+
+.reellimit-block-title {
+  font-size: 28px !important;
+  font-weight: 800 !important;
+  margin-bottom: 10px !important;
+  color: #f87171 !important;
+  letter-spacing: -0.5px !important;
+}
+
+.reellimit-block-sub {
+  font-size: 16px !important;
+  color: #cbd5e1 !important;
+  max-width: 460px !important;
+  line-height: 1.6 !important;
+  margin-bottom: 24px !important;
+}
+
+.reellimit-countdown-pill {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border: 1px solid rgba(239, 68, 68, 0.4) !important;
+  padding: 8px 18px !important;
+  border-radius: 9999px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #fca5a5 !important;
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Limit Reached - ReelLimit</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <div class="blocked-card">
+    <div class="shield-badge">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+      </svg>
+    </div>
+
+    <h1>Daily Limit Reached</h1>
+    <p class="subtitle">
+      You reached your daily limit of <strong id="limitTarget">20</strong> short videos.
+      Feed access is paused for today so you can focus on what matters.
+    </p>
+
+    <!-- Stats Breakdown -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-number" id="statTotal">0</span>
+        <span class="stat-label">Total Watched</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number" id="statYoutube">0</span>
+        <span class="stat-label">Shorts</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number" id="statInstagram">0</span>
+        <span class="stat-label">Reels</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number" id="statSnapchat">0</span>
+        <span class="stat-label">Spotlight</span>
+      </div>
+    </div>
+
+    <!-- Dopamine Reset Breathing Circle -->
+    <div class="breathing-widget">
+      <h3>Reset Your Focus</h3>
+      <div class="breathing-circle-container">
+        <div class="breathing-circle" id="breathCircle">
+          <span id="breathText">Breathe In</span>
+        </div>
+      </div>
+      <p class="breath-hint">Follow the circle for a quick 30-second breath reset.</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-buttons">
+      <button id="closeTabBtn" class="btn-primary">Close This Tab</button>
+    </div>
+  </div>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

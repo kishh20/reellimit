@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReelLimit Dashboard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-group">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <h1>ReelLimit</h1>
+          <span class="subtitle">Focus & Mindful Scrolling</span>
+        </div>
+      </div>
+      <div class="status-badge" id="statusBadge">Active</div>
+    </header>
+
+    <!-- Hero Counter Card -->
+    <div class="hero-card">
+      <div class="progress-ring-container">
+        <svg class="progress-ring" width="120" height="120">
+          <circle class="progress-ring-bg" stroke="rgba(255,255,255,0.08)" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+          <circle class="progress-ring-bar" id="progressRingBar" stroke="#6366f1" stroke-width="10" stroke-linecap="round" fill="transparent" r="50" cx="60" cy="60"/>
+        </svg>
+        <div class="progress-center">
+          <span class="count-display" id="totalCount">0</span>
+          <span class="limit-caption">of <span id="captionLimit">20</span> reels</span>
+        </div>
+      </div>
+
+      <div class="platform-stats">
+        <div class="platform-chip">
+          <span class="platform-icon yt">▶</span>
+          <span class="platform-name">Shorts</span>
+          <span class="platform-val" id="valYoutube">0</span>
+        </div>
+        <div class="platform-chip">
+          <span class="platform-icon ig">📷</span>
+          <span class="platform-name">Reels</span>
+          <span class="platform-val" id="valInstagram">0</span>
+        </div>
+        <div class="platform-chip">
+          <span class="platform-icon sc">👻</span>
+          <span class="platform-name">Spotlight</span>
+          <span class="platform-val" id="valSnapchat">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Section -->
+    <div class="settings-card">
+      <h2>Preferences & Limits</h2>
+
+      <div class="form-group">
+        <div class="label-row">
+          <label for="dailyLimitInput">Daily Limit (Reels)</label>
+          <span class="hint-value" id="dailyLimitVal">20</span>
+        </div>
+        <input type="range" id="dailyLimitInput" min="5" max="100" step="5" value="20">
+      </div>
+
+      <div class="form-group">
+        <div class="label-row">
+          <label for="reminderIntervalInput">Reminder Frequency</label>
+          <span class="hint-value" id="reminderVal">Every 10 reels</span>
+        </div>
+        <select id="reminderIntervalInput" class="custom-select">
+          <option value="5">Every 5 reels</option>
+          <option value="10" selected>Every 10 reels (Default)</option>
+          <option value="15">Every 15 reels</option>
+          <option value="20">Every 20 reels</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="limitActionSelect">When Limit is Reached</label>
+        <select id="limitActionSelect" class="custom-select">
+          <option value="block_page">Redirect to Full-Screen Block Page</option>
+          <option value="close_tab">Close Tab Automatically</option>
+        </select>
+      </div>
+
+      <div class="platforms-group">
+        <label class="group-title">Monitored Feeds</label>
+        <div class="toggle-row">
+          <span>YouTube Shorts</span>
+          <input type="checkbox" id="checkYoutube" class="toggle-switch" checked>
+        </div>
+        <div class="toggle-row">
+          <span>Instagram Reels</span>
+          <input type="checkbox" id="checkInstagram" class="toggle-switch" checked>
+        </div>
+        <div class="toggle-row">
+          <span>Snapchat Spotlight</span>
+          <input type="checkbox" id="checkSnapchat" class="toggle-switch" checked>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="footer-actions">
+      <button id="resetTodayBtn" class="btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+          <path d="M3 3v5h5"></path>
+        </svg>
+        Reset Count
+      </button>
+      <button id="saveBtn" class="btn-primary">Save Settings</button>
+    </div>
+
+    <div id="saveToast" class="save-toast">Settings saved successfully!</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

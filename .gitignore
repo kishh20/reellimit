@@ -1,0 +1,21 @@
+# Built application files
+*.apk
+*.aab
+
+# Build directories
+build/
+**/build/
+.gradle/
+**/.gradle/
+local.properties
+**/local.properties
+.cxx/
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.DS_Store
+
+# Node / Scratch
+node_modules/
+temp/
