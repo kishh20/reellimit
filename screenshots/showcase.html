@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReelLimit Showcase</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      width: 1200px;
+      height: 675px;
+      background: radial-gradient(circle at 50% 10%, #1e1b4b 0%, #0f172a 50%, #020617 100%);
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 60px;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Background decorative glow */
+    .glow-1 {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: rgba(99, 102, 241, 0.15);
+      border-radius: 50%;
+      filter: blur(100px);
+      top: -100px;
+      left: 100px;
+      pointer-events: none;
+    }
+    .glow-2 {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: rgba(236, 72, 153, 0.12);
+      border-radius: 50%;
+      filter: blur(120px);
+      bottom: -100px;
+      right: 150px;
+      pointer-events: none;
+    }
+
+    /* Header */
+    .showcase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1, #d946ef);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+    }
+    .brand-text h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+    }
+    .brand-text p {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .tagline-badge {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(129, 140, 248, 0.35);
+      color: #c7d2fe;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Main Showcase Body */
+    .showcase-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 50px;
+      z-index: 10;
+      margin-top: -10px;
+    }
+
+    /* Left Frame: Phone / Dashboard */
+    .frame-card {
+      width: 360px;
+      background: #1e293b;
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.2);
+    }
+
+    .frame-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #818cf8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .progress-center-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .count-big {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+    }
+    .count-sub {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .stats-chips {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .chip {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .chip span { display: block; }
+    .chip-name { font-size: 10px; color: #94a3b8; }
+    .chip-val { font-size: 14px; font-weight: 700; color: #f8fafc; margin-top: 2px; }
+
+    .slider-preview {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      padding: 10px 12px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .slider-preview strong { color: #818cf8; }
+
+    /* Right Frame: Block Screen Preview */
+    .block-card-frame {
+      width: 480px;
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1.5px solid rgba(239, 68, 68, 0.3);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(239, 68, 68, 0.2);
+      text-align: center;
+    }
+    .block-shield {
+      font-size: 42px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 0 15px rgba(239, 68, 68, 0.6));
+    }
+    .block-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #f87171;
+      margin-bottom: 6px;
+    }
+    .block-desc {
+      font-size: 13px;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    .breathe-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .breathe-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #6366f1 0%, #4338ca 100%);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .breathe-info {
+      text-align: left;
+    }
+    .breathe-info strong {
+      font-size: 13px;
+      color: #c7d2fe;
+      display: block;
+    }
+    .breathe-info span {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .close-btn-mock {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: #ffffff;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* Footer Features Banner */
+    .showcase-footer {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      z-index: 10;
+    }
+    .feature-pill {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 8px 18px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #e2e8f0;
+    }
+    .feature-pill .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+
+  <!-- Header -->
+  <header class="showcase-header">
+    <div class="brand">
+      <div class="brand-icon">⏱️</div>
+      <div class="brand-text">
+        <h1>ReelLimit</h1>
+        <p>Shorts, Reels &amp; Spotlight Focus Guard</p>
+      </div>
+    </div>
+    <div class="tagline-badge">Open Source • Android Native &amp; Chrome Extension</div>
+  </header>
+
+  <!-- Showcase Content -->
+  <div class="showcase-content">
+    <!-- Left: Dashboard -->
+    <div class="frame-card">
+      <div class="frame-title">📱 Live Monitor Dashboard</div>
+      <div class="progress-center-box">
+        <div class="count-big">14</div>
+        <div class="count-sub">of <strong>20</strong> Reels Watched Today</div>
+      </div>
+      <div class="stats-chips">
+        <div class="chip">
+          <span class="chip-name">▶ Shorts</span>
+          <span class="chip-val" style="color: #f87171;">8</span>
+        </div>
+        <div class="chip">
+          <span class="chip-name">📷 Reels</span>
+          <span class="chip-val" style="color: #ec4899;">6</span>
+        </div>
+        <div class="chip">
+          <span class="chip-name">👻 Spotlight</span>
+          <span class="chip-val" style="color: #facc15;">0</span>
+        </div>
+      </div>
+      <div class="slider-preview">
+        <span>Daily Limit</span>
+        <strong>20 Reels</strong>
+      </div>
+      <div class="slider-preview">
+        <span>Milestone Alert</span>
+        <strong style="color: #10b981;">Every 10 Reels</strong>
+      </div>
+    </div>
+
+    <!-- Right: Block Screen -->
+    <div class="block-card-frame">
+      <div class="block-shield">🛑</div>
+      <div class="block-title">Daily Limit Reached</div>
+      <p class="block-desc">
+        You've watched your limit of <strong>20 reels</strong> today.<br>
+        Feed automatically closed to safeguard your time &amp; focus.
+      </p>
+      <div class="breathe-box">
+        <div class="breathe-circle">RESET</div>
+        <div class="breathe-info">
+          <strong>4-7-8 Breathing Reset</strong>
+          <span>Calm the urge to doomscroll</span>
+        </div>
+      </div>
+      <div class="close-btn-mock">Feed Access Locked for Today</div>
+    </div>
+  </div>
+
+  <!-- Footer Features -->
+  <footer class="showcase-footer">
+    <div class="feature-pill"><span class="dot"></span> 1.8s Active-Watch Debounce</div>
+    <div class="feature-pill"><span class="dot"></span> Every 10-Reel Milestones</div>
+    <div class="feature-pill"><span class="dot"></span> Auto-Close App at Limit</div>
+    <div class="feature-pill"><span class="dot"></span> 100% Private (No Internet Permission)</div>
+  </footer>
+</body>
+</html>
