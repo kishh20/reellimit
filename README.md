@@ -2,6 +2,9 @@
 
 A dual-platform digital wellbeing solution that monitors short-form video consumption across **Instagram Reels**, **YouTube Shorts**, and **Snapchat Spotlight**, delivers mindful reminder alerts every 10 videos, and automatically closes the application when your daily watch limit is reached.
 
+[![Download ReelLimit APK](https://img.shields.io/badge/Download-ReelLimit.apk-blue?style=for-the-badge&logo=android)](https://github.com/kishh20/reellimit/releases/download/v1.0.0/ReelLimit.apk)
+[![GitHub Release](https://img.shields.io/github/v/release/kishh20/reellimit?style=for-the-badge)](https://github.com/kishh20/reellimit/releases/tag/v1.0.0)
+
 ---
 
 ## Solutions Included
