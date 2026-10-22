@@ -50,8 +50,10 @@
       const match = path.match(/\/spotlight\/([a-zA-Z0-9_-]+)/);
       if (match) return match[1];
       if (path.includes('/spotlight')) {
-        // Fallback for spotlight feed without ID in URL
-        return 'spotlight-active';
+        const activeVideo = document.querySelector('video[src]');
+        if (activeVideo && activeVideo.src) {
+          return activeVideo.src.split('?')[0].slice(-30);
+        }
       }
       return null;
     }

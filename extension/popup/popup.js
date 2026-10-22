@@ -59,28 +59,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load status from background
   async function loadStatus() {
     try {
-      const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
-      if (!response || !response.success) return;
+      if (window.chrome?.runtime?.sendMessage) {
+        const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+        if (!response || !response.success) return;
 
-      const { settings, today } = response;
+        const { settings, today } = response;
 
-      totalCountEl.textContent = today.total || 0;
-      captionLimitEl.textContent = settings.dailyLimit || 20;
-      dailyLimitInput.value = settings.dailyLimit || 20;
-      dailyLimitVal.textContent = settings.dailyLimit || 20;
+        totalCountEl.textContent = today.total || 0;
+        captionLimitEl.textContent = settings.dailyLimit || 20;
+        dailyLimitInput.value = settings.dailyLimit || 20;
+        dailyLimitVal.textContent = settings.dailyLimit || 20;
 
-      valYoutube.textContent = today.youtube || 0;
-      valInstagram.textContent = today.instagram || 0;
-      valSnapchat.textContent = today.snapchat || 0;
+        valYoutube.textContent = today.youtube || 0;
+        valInstagram.textContent = today.instagram || 0;
+        valSnapchat.textContent = today.snapchat || 0;
 
-      reminderIntervalInput.value = settings.reminderInterval || 10;
-      limitActionSelect.value = settings.limitAction || 'block_page';
+        reminderIntervalInput.value = settings.reminderInterval || 10;
+        limitActionSelect.value = settings.limitAction || 'block_page';
 
-      checkYoutube.checked = Boolean(settings.platforms?.youtube);
-      checkInstagram.checked = Boolean(settings.platforms?.instagram);
-      checkSnapchat.checked = Boolean(settings.platforms?.snapchat);
+        checkYoutube.checked = Boolean(settings.platforms?.youtube);
+        checkInstagram.checked = Boolean(settings.platforms?.instagram);
+        checkSnapchat.checked = Boolean(settings.platforms?.snapchat);
 
-      updateProgressRing(today.total || 0, settings.dailyLimit || 20);
+        updateProgressRing(today.total || 0, settings.dailyLimit || 20);
+      } else {
+        // Standalone preview fallback for screenshots & web previews
+        totalCountEl.textContent = '14';
+        captionLimitEl.textContent = '20';
+        dailyLimitInput.value = '20';
+        dailyLimitVal.textContent = '20';
+        valYoutube.textContent = '8';
+        valInstagram.textContent = '6';
+        valSnapchat.textContent = '0';
+        reminderIntervalInput.value = '10';
+        updateProgressRing(14, 20);
+      }
     } catch (err) {
       console.error('Error fetching status:', err);
     }

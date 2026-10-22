@@ -19,10 +19,26 @@ import androidx.core.app.NotificationCompat
 class ReelAccessibilityService : AccessibilityService() {
 
     private lateinit var prefs: PreferencesManager
-    private val handler = Looper.myLooper()?.let { Handler(it) } ?: Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
 
-    private var lastScrollTime: Long = 0L
-    private val DEBOUNCE_DELAY_MS = 1800L // 1.8 seconds between counts to ensure active viewing
+    // Accuracy Tracking State
+    private var lastCountedFingerprint: String? = null
+    private var currentPendingFingerprint: String? = null
+    private var pendingPlatform: String? = null
+
+    // Require 2.5 seconds of continuous viewing on a new video before counting it
+    // This eliminates false counts from fast scrolling or skimming
+    private val ACTIVE_WATCH_THRESHOLD_MS = 2500L
+
+    private val watchRunnable = Runnable {
+        val pendingFp = currentPendingFingerprint
+        val platform = pendingPlatform
+        if (pendingFp != null && platform != null && pendingFp != lastCountedFingerprint) {
+            lastCountedFingerprint = pendingFp
+            currentPendingFingerprint = null
+            onReelWatched(platform)
+        }
+    }
 
     companion object {
         const val CHANNEL_ID = "reellimit_alerts"
@@ -46,34 +62,34 @@ class ReelAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         isServiceRunning = false
+        mainHandler.removeCallbacksAndMessages(null)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val packageName = event.packageName?.toString() ?: return
 
-        // 1. Check if user is attempting to open an app while limit is active
+        // 1. If limit is active, block access to monitored apps
         if (prefs.isLimitReached()) {
             if (isMonitoredPackage(packageName)) {
-                enforceAppClose("Daily limit already reached for today!")
-                return
+                if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                    enforceAppClose("Daily limit already reached for today!")
+                    return
+                }
             }
         }
 
-        // 2. Filter events
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_VIEW_SCROLLED,
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                if (isMonitoredPackage(packageName)) {
-                    inspectForReelScroll(packageName, rootInActiveWindow)
-                }
-            }
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                if (isMonitoredPackage(packageName) && prefs.isLimitReached()) {
-                    enforceAppClose("Daily limit reached!")
-                }
-            }
+        // 2. Only process monitored packages
+        if (!isMonitoredPackage(packageName)) {
+            // User switched to another app: cancel pending watch
+            mainHandler.removeCallbacks(watchRunnable)
+            currentPendingFingerprint = null
+            return
         }
+
+        // 3. Inspect the active window hierarchy to identify if a short-form video is being watched
+        val rootNode = rootInActiveWindow ?: return
+        inspectForReel(packageName, rootNode)
     }
 
     private fun isMonitoredPackage(packageName: String): Boolean {
@@ -85,60 +101,181 @@ class ReelAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun inspectForReelScroll(packageName: String, rootNode: AccessibilityNodeInfo?) {
-        val now = System.currentTimeMillis()
-        if (now - lastScrollTime < DEBOUNCE_DELAY_MS) return
-
-        val isReelActive = when (packageName) {
-            PACKAGE_YOUTUBE -> isYouTubeShortsActive(rootNode)
-            PACKAGE_INSTAGRAM -> isInstagramReelActive(rootNode)
-            PACKAGE_SNAPCHAT -> isSnapchatSpotlightActive(rootNode)
-            else -> false
+    private fun inspectForReel(packageName: String, rootNode: AccessibilityNodeInfo) {
+        val platform = when (packageName) {
+            PACKAGE_YOUTUBE -> "youtube"
+            PACKAGE_INSTAGRAM -> "instagram"
+            PACKAGE_SNAPCHAT -> "snapchat"
+            else -> return
         }
 
-        if (isReelActive) {
-            lastScrollTime = now
-            val platform = when (packageName) {
-                PACKAGE_YOUTUBE -> "youtube"
-                PACKAGE_INSTAGRAM -> "instagram"
-                else -> "snapchat"
+        val fingerprint = when (platform) {
+            "youtube" -> getYouTubeShortsFingerprint(rootNode)
+            "instagram" -> getInstagramReelFingerprint(rootNode)
+            "snapchat" -> getSnapchatSpotlightFingerprint(rootNode)
+            else -> null
+        }
+
+        // User is NOT on a short-form video right now (e.g. in Chats, DMs, Home Feed, Camera, etc.)
+        if (fingerprint == null) {
+            mainHandler.removeCallbacks(watchRunnable)
+            currentPendingFingerprint = null
+            return
+        }
+
+        // Video was ALREADY counted once! Do not count again, even if watched for minutes.
+        if (fingerprint == lastCountedFingerprint) {
+            return
+        }
+
+        // Already waiting on this exact pending video's threshold timer
+        if (fingerprint == currentPendingFingerprint) {
+            return
+        }
+
+        // User has arrived at a NEW video!
+        // Start the 2.5s active-viewing verification timer.
+        mainHandler.removeCallbacks(watchRunnable)
+        currentPendingFingerprint = fingerprint
+        pendingPlatform = platform
+        mainHandler.postDelayed(watchRunnable, ACTIVE_WATCH_THRESHOLD_MS)
+    }
+
+    // ==========================================
+    // YOUTUBE SHORTS DETECTION
+    // ==========================================
+    private fun getYouTubeShortsFingerprint(rootNode: AccessibilityNodeInfo): String? {
+        // Exclude standard watch pages and main search
+        if (hasAnyViewId(rootNode, "watch_panel", "watch_while_layout", "player_control_play_pause_replay_button")) {
+            return null
+        }
+
+        // Must be in Shorts container
+        val isShorts = hasAnyViewId(rootNode, "shorts_player_pager", "reel_recycler", "reel_player_page_view", "shorts_container")
+        if (!isShorts) return null
+
+        // Extract title or channel name to identify this specific short
+        val textSnippets = collectMeaningfulText(rootNode, maxItems = 4)
+        if (textSnippets.isNotEmpty()) {
+            return "yt_" + textSnippets.joinToString("_").take(60)
+        }
+        return "yt_short_" + rootNode.hashCode()
+    }
+
+    // ==========================================
+    // INSTAGRAM REELS DETECTION
+    // ==========================================
+    private fun getInstagramReelFingerprint(rootNode: AccessibilityNodeInfo): String? {
+        // 1. HARD EXCLUSION: Direct Messages (Chats)
+        if (hasAnyViewId(rootNode, "direct_text_message", "row_thread_composer", "message_composer", "direct_thread", "inbox")) {
+            return null
+        }
+
+        // 2. HARD EXCLUSION: Stories viewer
+        if (hasAnyViewId(rootNode, "story_progress_bar", "viewer_reel_header", "reel_viewer_title")) {
+            return null
+        }
+
+        // 3. Must be in Reels / Clips viewer
+        val isClips = hasAnyViewId(rootNode, "clips_viewer_fragment", "clips_video_container", "clips_media_item", "clips_viewer")
+        if (!isClips) return null
+
+        // Extract author handle or audio title to fingerprint this specific reel
+        val textSnippets = collectMeaningfulText(rootNode, maxItems = 4)
+        if (textSnippets.isNotEmpty()) {
+            return "ig_" + textSnippets.joinToString("_").take(60)
+        }
+        return "ig_reel_" + rootNode.hashCode()
+    }
+
+    // ==========================================
+    // SNAPCHAT SPOTLIGHT DETECTION
+    // ==========================================
+    private fun getSnapchatSpotlightFingerprint(rootNode: AccessibilityNodeInfo): String? {
+        // 1. HARD EXCLUSION: Chats / Friends screen
+        if (hasAnyViewId(rootNode, "chat_input_text", "chat_message", "chat_container", "chat_feed", "chat_session", "presence", "composer")) {
+            return null
+        }
+        val chatTextMatches = rootNode.findAccessibilityNodeInfosByText("Send a chat")
+        if (chatTextMatches.isNotEmpty()) return null
+
+        // 2. HARD EXCLUSION: Camera screen & Map
+        if (hasAnyViewId(rootNode, "camera_capture_button", "shutter_button", "map_view")) {
+            return null
+        }
+
+        // 3. MUST BE in the actual full-screen Spotlight player container
+        val isSpotlightPlayer = hasAnyViewId(rootNode, "spotlight_carousel", "spotlight_video", "spotlight_fullscreen", "spotlight_player", "neon_view_pager")
+        if (!isSpotlightPlayer) return null
+
+        // Verify spotlight controls are present (sound title, like button, creator handle)
+        val textSnippets = collectMeaningfulText(rootNode, maxItems = 3)
+        if (textSnippets.isNotEmpty()) {
+            return "sc_" + textSnippets.joinToString("_").take(60)
+        }
+        return "sc_spotlight_" + rootNode.hashCode()
+    }
+
+    // ==========================================
+    // HIERARCHY HELPER UTILITIES
+    // ==========================================
+    private fun hasAnyViewId(root: AccessibilityNodeInfo?, vararg idFragments: String): Boolean {
+        if (root == null) return false
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
+
+        while (queue.isNotEmpty() && visited < 150) {
+            val node = queue.removeFirst()
+            visited++
+            val resId = node.viewIdResourceName?.lowercase()
+            if (resId != null) {
+                for (frag in idFragments) {
+                    if (resId.contains(frag.lowercase())) {
+                        return true
+                    }
+                }
             }
-            onReelWatched(platform)
+
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
         }
+        return false
     }
 
-    private fun isYouTubeShortsActive(rootNode: AccessibilityNodeInfo?): Boolean {
-        if (rootNode == null) return false
-        // Search node tree for YouTube Shorts indicators
-        val shortsNodes = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/shorts_player_pager")
-        if (shortsNodes.isNotEmpty()) return true
+    private fun collectMeaningfulText(root: AccessibilityNodeInfo?, maxItems: Int = 4): List<String> {
+        val result = mutableListOf<String>()
+        if (root == null) return result
 
-        val reelRecycler = rootNode.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_recycler")
-        if (reelRecycler.isNotEmpty()) return true
+        val queue = ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        var visited = 0
 
-        val textMatches = rootNode.findAccessibilityNodeInfosByText("Shorts")
-        return textMatches.isNotEmpty()
-    }
+        // Filter out generic UI buttons and tabs that appear across screens
+        val ignoredWords = setOf(
+            "like", "comment", "share", "send", "more", "search", "home",
+            "reels", "spotlight", "profile", "subscribe", "following",
+            "camera", "chat", "reply", "remix", "audio"
+        )
 
-    private fun isInstagramReelActive(rootNode: AccessibilityNodeInfo?): Boolean {
-        if (rootNode == null) return false
-        val clipsNodes = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/clips_viewer")
-        if (clipsNodes.isNotEmpty()) return true
+        while (queue.isNotEmpty() && visited < 120 && result.size < maxItems) {
+            val node = queue.removeFirst()
+            visited++
 
-        val reelNodes = rootNode.findAccessibilityNodeInfosByViewId("com.instagram.android:id/reel_viewer")
-        if (reelNodes.isNotEmpty()) return true
+            val text = node.text?.toString()?.trim()
+            if (!text.isNullOrEmpty() && text.length >= 3) {
+                val lower = text.lowercase()
+                if (!ignoredWords.contains(lower)) {
+                    result.add(text.replace("\\s+".toRegex(), "_"))
+                }
+            }
 
-        val textMatches = rootNode.findAccessibilityNodeInfosByText("Reels")
-        return textMatches.isNotEmpty()
-    }
-
-    private fun isSnapchatSpotlightActive(rootNode: AccessibilityNodeInfo?): Boolean {
-        if (rootNode == null) return false
-        val spotlightNodes = rootNode.findAccessibilityNodeInfosByViewId("com.snapchat.android:id/spotlight_carousel")
-        if (spotlightNodes.isNotEmpty()) return true
-
-        val textMatches = rootNode.findAccessibilityNodeInfosByText("Spotlight")
-        return textMatches.isNotEmpty()
+            for (i in 0 until node.childCount) {
+                node.getChild(i)?.let { queue.add(it) }
+            }
+        }
+        return result
     }
 
     private fun onReelWatched(platform: String) {
@@ -156,9 +293,6 @@ class ReelAccessibilityService : AccessibilityService() {
         }
     }
 
-    /**
-     * Closes the foreground app by sending HOME action and launches the Lock Overlay Screen
-     */
     private fun enforceAppClose(reason: String) {
         // 1. Kick user immediately to the device Home Screen
         performGlobalAction(GLOBAL_ACTION_HOME)
@@ -170,14 +304,14 @@ class ReelAccessibilityService : AccessibilityService() {
         sendLimitNotification(prefs.dailyLimit)
 
         // 4. Launch Lock Screen overlay after slight delay so HOME action completes
-        handler.postDelayed({
+        mainHandler.postDelayed({
             val intent = Intent(this, LockOverlayActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra("reason", reason)
                 putExtra("limit", prefs.dailyLimit)
             }
             startActivity(intent)
-        }, 300)
+        }, 350)
     }
 
     private fun sendReminderNotification(count: Int) {
@@ -254,5 +388,6 @@ class ReelAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         isServiceRunning = false
+        mainHandler.removeCallbacksAndMessages(null)
     }
 }

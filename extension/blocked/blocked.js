@@ -15,14 +15,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load stats
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
-    if (response && response.success) {
-      const { settings, today } = response;
-      limitTargetEl.textContent = settings.dailyLimit || 20;
-      statTotalEl.textContent = today.total || 0;
-      statYoutubeEl.textContent = today.youtube || 0;
-      statInstagramEl.textContent = today.instagram || 0;
-      statSnapchatEl.textContent = today.snapchat || 0;
+    if (window.chrome?.runtime?.sendMessage) {
+      const response = await chrome.runtime.sendMessage({ type: 'GET_STATUS' });
+      if (response && response.success) {
+        const { settings, today } = response;
+        limitTargetEl.textContent = settings.dailyLimit || 20;
+        statTotalEl.textContent = today.total || 0;
+        statYoutubeEl.textContent = today.youtube || 0;
+        statInstagramEl.textContent = today.instagram || 0;
+        statSnapchatEl.textContent = today.snapchat || 0;
+      }
+    } else {
+      // Standalone preview fallback
+      limitTargetEl.textContent = '20';
+      statTotalEl.textContent = '20';
+      statYoutubeEl.textContent = '12';
+      statInstagramEl.textContent = '8';
+      statSnapchatEl.textContent = '0';
     }
   } catch (err) {
     console.error('Error loading stats:', err);
