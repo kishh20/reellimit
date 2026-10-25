@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+layout.buildDirectory.set(file(System.getProperty("java.io.tmpdir") + "/reellimit-build/app"))
+
 android {
     namespace = "com.reellimit.app"
     compileSdk = 36

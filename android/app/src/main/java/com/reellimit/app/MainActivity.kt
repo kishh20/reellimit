@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -39,9 +40,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDailyLimitValue: TextView
     private lateinit var sliderDailyLimit: Slider
 
+    private lateinit var tvWatchThresholdValue: TextView
+    private lateinit var sliderWatchThreshold: Slider
+
     private lateinit var switchYoutube: SwitchMaterial
     private lateinit var switchInstagram: SwitchMaterial
     private lateinit var switchSnapchat: SwitchMaterial
+
+    private lateinit var switchFloatingOverlay: SwitchMaterial
+    private lateinit var switchHapticTick: SwitchMaterial
 
     private lateinit var btnResetToday: Button
     private lateinit var btnTestReminder: Button
@@ -75,9 +82,15 @@ class MainActivity : AppCompatActivity() {
         tvDailyLimitValue = findViewById(R.id.tvDailyLimitValue)
         sliderDailyLimit = findViewById(R.id.sliderDailyLimit)
 
+        tvWatchThresholdValue = findViewById(R.id.tvWatchThresholdValue)
+        sliderWatchThreshold = findViewById(R.id.sliderWatchThreshold)
+
         switchYoutube = findViewById(R.id.switchYoutube)
         switchInstagram = findViewById(R.id.switchInstagram)
         switchSnapchat = findViewById(R.id.switchSnapchat)
+
+        switchFloatingOverlay = findViewById(R.id.switchFloatingOverlay)
+        switchHapticTick = findViewById(R.id.switchHapticTick)
 
         btnResetToday = findViewById(R.id.btnResetToday)
         btnTestReminder = findViewById(R.id.btnTestReminder)
@@ -86,9 +99,16 @@ class MainActivity : AppCompatActivity() {
         sliderDailyLimit.value = prefs.dailyLimit.toFloat()
         tvDailyLimitValue.text = "${prefs.dailyLimit} Reels"
 
+        val threshold = prefs.watchThresholdSeconds
+        sliderWatchThreshold.value = threshold
+        tvWatchThresholdValue.text = "${threshold}s"
+
         switchYoutube.isChecked = prefs.isYoutubeEnabled
         switchInstagram.isChecked = prefs.isInstagramEnabled
         switchSnapchat.isChecked = prefs.isSnapchatEnabled
+
+        switchFloatingOverlay.isChecked = prefs.showFloatingOverlay
+        switchHapticTick.isChecked = prefs.hapticFeedbackEnabled
     }
 
     private fun setupListeners() {
@@ -106,6 +126,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        sliderWatchThreshold.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) {
+                prefs.watchThresholdSeconds = value
+                tvWatchThresholdValue.text = "${value}s"
+            }
+        }
+
         switchYoutube.setOnCheckedChangeListener { _, isChecked ->
             prefs.isYoutubeEnabled = isChecked
         }
@@ -116,6 +143,22 @@ class MainActivity : AppCompatActivity() {
 
         switchSnapchat.setOnCheckedChangeListener { _, isChecked ->
             prefs.isSnapchatEnabled = isChecked
+        }
+
+        switchFloatingOverlay.setOnCheckedChangeListener { _, isChecked ->
+            prefs.showFloatingOverlay = isChecked
+            if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+                Toast.makeText(this, "Enable 'Display over other apps' to show live counter HUD", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        switchHapticTick.setOnCheckedChangeListener { _, isChecked ->
+            prefs.hapticFeedbackEnabled = isChecked
         }
 
         btnResetToday.setOnClickListener {

@@ -17,6 +17,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_ENABLE_YOUTUBE = "enable_youtube"
         private const val KEY_ENABLE_INSTAGRAM = "enable_instagram"
         private const val KEY_ENABLE_SNAPCHAT = "enable_snapchat"
+        private const val KEY_WATCH_THRESHOLD = "watch_threshold"
+        private const val KEY_SHOW_OVERLAY = "show_overlay"
+        private const val KEY_HAPTIC_ENABLED = "haptic_enabled"
 
         private const val KEY_SAVED_DATE = "saved_date"
         private const val KEY_COUNT_TOTAL = "count_total"
@@ -26,6 +29,7 @@ class PreferencesManager(context: Context) {
 
         const val DEFAULT_DAILY_LIMIT = 20
         const val DEFAULT_REMINDER_INTERVAL = 10
+        const val DEFAULT_WATCH_THRESHOLD = 2.0f // seconds
     }
 
     private fun getTodayDateString(): String {
@@ -65,6 +69,18 @@ class PreferencesManager(context: Context) {
     var isSnapchatEnabled: Boolean
         get() = prefs.getBoolean(KEY_ENABLE_SNAPCHAT, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLE_SNAPCHAT, value).apply()
+
+    var watchThresholdSeconds: Float
+        get() = prefs.getFloat(KEY_WATCH_THRESHOLD, DEFAULT_WATCH_THRESHOLD)
+        set(value) = prefs.edit().putFloat(KEY_WATCH_THRESHOLD, value).apply()
+
+    var showFloatingOverlay: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_OVERLAY, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_OVERLAY, value).apply()
+
+    var hapticFeedbackEnabled: Boolean
+        get() = prefs.getBoolean(KEY_HAPTIC_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_HAPTIC_ENABLED, value).apply()
 
     fun getTotalWatched(): Int {
         checkAndResetIfNewDay()
