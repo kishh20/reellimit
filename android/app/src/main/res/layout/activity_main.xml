@@ -99,6 +99,53 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Overlay Permission Warning (Shown when Display over other apps is missing) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardOverlayWarning"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="#2A2416"
+            app:cardCornerRadius="14dp"
+            app:strokeColor="@color/warning"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🫧 Floating Bubble Permission Needed"
+                    android:textColor="#FDE047"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="To show the floating reel bubble over YouTube, Instagram, and Snapchat, tap below to grant 'Display over other apps'."
+                    android:textColor="#E2E8F0"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btnEnableOverlay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="@color/warning"
+                    android:text="Grant Overlay Access"
+                    android:textColor="#000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Hero Metric Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -447,6 +494,19 @@
                     android:text="💡 Tip: You can also touch and drag the bubble anywhere on screen while watching reels!"
                     android:textColor="#94A3B8"
                     android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/btnTestBubble"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginBottom="12dp"
+                    android:backgroundTint="#0F172A"
+                    android:text="🫧 Test / Preview Reel Bubble"
+                    android:textColor="#38BDF8"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    app:strokeColor="#38BDF8"
+                    app:strokeWidth="1dp" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/switchHapticTick"

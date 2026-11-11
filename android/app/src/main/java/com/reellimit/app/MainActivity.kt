@@ -31,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cardPermissionWarning: MaterialCardView
     private lateinit var btnEnableAccessibility: Button
 
+    private lateinit var cardOverlayWarning: MaterialCardView
+    private lateinit var btnEnableOverlay: Button
+
     private lateinit var tvTotalWatched: TextView
     private lateinit var tvLimitCaption: TextView
     private lateinit var tvCountYoutube: TextView
@@ -52,6 +55,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toggleBubbleCorner: com.google.android.material.button.MaterialButtonToggleGroup
     private lateinit var btnCornerLeft: com.google.android.material.button.MaterialButton
     private lateinit var btnCornerRight: com.google.android.material.button.MaterialButton
+    private lateinit var btnTestBubble: Button
+
     private lateinit var switchHapticTick: SwitchMaterial
 
     private lateinit var btnResetToday: Button
@@ -77,6 +82,9 @@ class MainActivity : AppCompatActivity() {
         cardPermissionWarning = findViewById(R.id.cardPermissionWarning)
         btnEnableAccessibility = findViewById(R.id.btnEnableAccessibility)
 
+        cardOverlayWarning = findViewById(R.id.cardOverlayWarning)
+        btnEnableOverlay = findViewById(R.id.btnEnableOverlay)
+
         tvTotalWatched = findViewById(R.id.tvTotalWatched)
         tvLimitCaption = findViewById(R.id.tvLimitCaption)
         tvCountYoutube = findViewById(R.id.tvCountYoutube)
@@ -98,6 +106,8 @@ class MainActivity : AppCompatActivity() {
         toggleBubbleCorner = findViewById(R.id.toggleBubbleCorner)
         btnCornerLeft = findViewById(R.id.btnCornerLeft)
         btnCornerRight = findViewById(R.id.btnCornerRight)
+        btnTestBubble = findViewById(R.id.btnTestBubble)
+
         switchHapticTick = findViewById(R.id.switchHapticTick)
 
         btnResetToday = findViewById(R.id.btnResetToday)
@@ -130,6 +140,16 @@ class MainActivity : AppCompatActivity() {
         btnEnableAccessibility.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
             startActivity(intent)
+        }
+
+        btnEnableOverlay.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            }
         }
 
         sliderDailyLimit.addOnChangeListener { _, value, fromUser ->
@@ -185,6 +205,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        btnTestBubble.setOnClickListener {
+            if (!isAccessibilityServiceEnabled()) {
+                Toast.makeText(this, "⚠️ Please enable ReelLimit in Accessibility Settings first!", Toast.LENGTH_LONG).show()
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                return@setOnClickListener
+            }
+            val intent = Intent(this, ReelAccessibilityService::class.java).apply {
+                action = ReelAccessibilityService.ACTION_TEST_BUBBLE
+            }
+            startService(intent)
+            val cornerName = if (prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT) "Top Left" else "Top Right"
+            Toast.makeText(this, "🫧 Reel bubble preview activated in $cornerName! Try dragging it.", Toast.LENGTH_LONG).show()
+        }
+
         switchHapticTick.setOnCheckedChangeListener { _, isChecked ->
             prefs.hapticFeedbackEnabled = isChecked
         }
@@ -204,13 +238,27 @@ class MainActivity : AppCompatActivity() {
     private fun updateDashboard() {
         val isServiceEnabled = isAccessibilityServiceEnabled()
         if (isServiceEnabled) {
-            tvServiceStatus.text = "Active & Monitoring"
-            tvServiceStatus.setTextColor(ContextCompat.getColor(this, R.color.success))
-            cardPermissionWarning.visibility = View.GONE
+            if (ReelAccessibilityService.isServiceRunning) {
+                tvServiceStatus.text = "Active & Monitoring"
+                tvServiceStatus.setTextColor(ContextCompat.getColor(this, R.color.success))
+                cardPermissionWarning.visibility = View.GONE
+            } else {
+                tvServiceStatus.text = "Re-toggle in Accessibility Settings"
+                tvServiceStatus.setTextColor(ContextCompat.getColor(this, R.color.warning))
+                cardPermissionWarning.visibility = View.VISIBLE
+            }
         } else {
             tvServiceStatus.text = "Service Disabled"
             tvServiceStatus.setTextColor(ContextCompat.getColor(this, R.color.danger))
             cardPermissionWarning.visibility = View.VISIBLE
+        }
+
+        // Overlay permission check
+        val hasOverlayPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
+        if (!hasOverlayPermission && prefs.showFloatingOverlay) {
+            cardOverlayWarning.visibility = View.VISIBLE
+        } else {
+            cardOverlayWarning.visibility = View.GONE
         }
 
         val total = prefs.getTotalWatched()

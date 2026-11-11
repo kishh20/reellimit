@@ -15,7 +15,6 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -87,6 +86,10 @@ class ReelAccessibilityService : AccessibilityService() {
         const val PACKAGE_YOUTUBE = "com.google.android.youtube"
         const val PACKAGE_INSTAGRAM = "com.instagram.android"
         const val PACKAGE_SNAPCHAT = "com.snapchat.android"
+        const val PACKAGE_REEL_LIMIT = "com.reellimit.app"
+
+        const val ACTION_TEST_BUBBLE = "com.reellimit.app.ACTION_TEST_BUBBLE"
+        const val ACTION_SHOW_BUBBLE = "com.reellimit.app.ACTION_SHOW_BUBBLE"
 
         var isServiceRunning = false
     }
@@ -97,6 +100,18 @@ class ReelAccessibilityService : AccessibilityService() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         isServiceRunning = true
         createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_TEST_BUBBLE || intent?.action == ACTION_SHOW_BUBBLE) {
+            mainHandler.post {
+                ensureFloatingHudCreated()
+                updateFloatingHud(HudStatus.LOCKED)
+                hudContainer?.visibility = View.VISIBLE
+                hudContainer?.alpha = 1.0f
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
@@ -145,6 +160,8 @@ class ReelAccessibilityService : AccessibilityService() {
             activePlatform = getPlatformFromPackage(packageName)
             mainHandler.removeCallbacks(tickerRunnable)
             mainHandler.post(tickerRunnable)
+            // Immediately display the bubble when user opens YouTube, Instagram, Snapchat, or ReelLimit!
+            updateFloatingHud(HudStatus.LOCKED)
         }
 
         // 4. SCROLL EVENT DETECTION:
@@ -171,6 +188,7 @@ class ReelAccessibilityService : AccessibilityService() {
             PACKAGE_YOUTUBE -> "youtube"
             PACKAGE_INSTAGRAM -> "instagram"
             PACKAGE_SNAPCHAT -> "snapchat"
+            PACKAGE_REEL_LIMIT -> "reellimit"
             else -> ""
         }
     }
@@ -180,6 +198,7 @@ class ReelAccessibilityService : AccessibilityService() {
             PACKAGE_YOUTUBE -> prefs.isYoutubeEnabled
             PACKAGE_INSTAGRAM -> prefs.isInstagramEnabled
             PACKAGE_SNAPCHAT -> prefs.isSnapchatEnabled
+            PACKAGE_REEL_LIMIT -> true
             else -> false
         }
     }
@@ -191,6 +210,12 @@ class ReelAccessibilityService : AccessibilityService() {
         val rootNode = rootInActiveWindow ?: return
         val platform = activePlatform ?: return
 
+        // In ReelLimit app: keep bubble visible in preview mode
+        if (platform == "reellimit") {
+            updateFloatingHud(HudStatus.LOCKED)
+            return
+        }
+
         // Check if user is currently watching short-form video or elsewhere in the app
         val signature = when (platform) {
             "youtube" -> evaluateYouTubeShorts(rootNode)
@@ -199,10 +224,11 @@ class ReelAccessibilityService : AccessibilityService() {
             else -> null
         }
 
-        // --- CASE A: User is NOT on a short-form video (e.g. Chat, Home, Camera) ---
+        // --- CASE A: User is in app, but not on active short video (e.g. Home feed, Profile, Search) ---
         if (signature == null) {
             videoWatchStartTime = 0L
             currentVideoSignature = null
+            // DO NOT HIDE! Keep bubble visible in calm idle state so user always knows their current count!
             updateFloatingHud(HudStatus.PAUSED)
             return
         }
@@ -265,7 +291,7 @@ class ReelAccessibilityService : AccessibilityService() {
         // Must be in Shorts container
         val isShorts = hasAnyViewId(
             rootNode,
-            "shorts_player_pager", "reel_recycler", "reel_player_page_view", "shorts_container"
+            "shorts_player_pager", "reel_recycler", "reel_player_page_view", "shorts_container", "shorts_player"
         )
         if (!isShorts) return null
 
@@ -298,7 +324,8 @@ class ReelAccessibilityService : AccessibilityService() {
         // 3. Must be in Reels / Clips viewer
         val isClips = hasAnyViewId(
             rootNode,
-            "clips_viewer_fragment", "clips_video_container", "clips_media_item", "clips_viewer"
+            "clips_viewer_fragment", "clips_video_container", "clips_media_item", "clips_viewer",
+            "reel_viewer", "clips_video", "feed_video"
         )
         if (!isClips) return null
 
@@ -349,7 +376,7 @@ class ReelAccessibilityService : AccessibilityService() {
         val isSpotlight = hasAnyViewId(
             rootNode,
             "spotlight_video", "spotlight_fullscreen", "spotlight_player",
-            "spotlight_action_menu", "spotlight_description", "spotlight_audio"
+            "spotlight_action_menu", "spotlight_description", "spotlight_audio", "neon_view_pager"
         )
         if (!isSpotlight) return null
 
@@ -475,10 +502,6 @@ class ReelAccessibilityService : AccessibilityService() {
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            return
-        }
-
         mainHandler.post {
             ensureFloatingHudCreated()
             val container = hudContainer ?: return@post
@@ -487,10 +510,10 @@ class ReelAccessibilityService : AccessibilityService() {
             val limit = prefs.dailyLimit
 
             mainHandler.removeCallbacks(hideHudRunnable)
+            container.visibility = View.VISIBLE
 
             when (status) {
                 HudStatus.WATCHING -> {
-                    container.visibility = View.VISIBLE
                     container.alpha = 1.0f
                     tvBubbleIcon?.text = "⏱️"
                     tvBubbleCount?.text = "$total"
@@ -505,7 +528,6 @@ class ReelAccessibilityService : AccessibilityService() {
                 }
 
                 HudStatus.COUNTED -> {
-                    container.visibility = View.VISIBLE
                     container.alpha = 1.0f
                     tvBubbleIcon?.text = "✅"
                     tvBubbleCount?.text = "$total"
@@ -538,8 +560,8 @@ class ReelAccessibilityService : AccessibilityService() {
                 }
 
                 HudStatus.LOCKED -> {
-                    container.visibility = View.VISIBLE
-                    container.alpha = 0.85f // sleek, unobtrusive
+                    // Counted or active video:
+                    container.alpha = 0.90f
                     tvBubbleIcon?.text = "🎬"
                     tvBubbleCount?.text = "$total"
                     tvBubbleLimit?.text = "/$limit"
@@ -550,8 +572,7 @@ class ReelAccessibilityService : AccessibilityService() {
                 }
 
                 HudStatus.TRANSITION -> {
-                    container.visibility = View.VISIBLE
-                    container.alpha = 0.9f
+                    container.alpha = 0.95f
                     tvBubbleIcon?.text = "🔄"
                     if (!isDetailsExpanded) {
                         tvBubbleStatus?.visibility = View.GONE
@@ -560,15 +581,16 @@ class ReelAccessibilityService : AccessibilityService() {
                 }
 
                 HudStatus.PAUSED -> {
-                    // Non-reel screen (Chat, DM, Stories, Home):
-                    // Dim gently and hide after 1.5 seconds so chat screens stay completely unobstructed!
+                    // In-app browsing (Home feed, Explore, Profile):
+                    // Keep bubble visible in corner with calm, muted border so user always knows their progress
+                    container.alpha = 0.75f
+                    tvBubbleIcon?.text = "🎬"
+                    tvBubbleCount?.text = "$total"
+                    tvBubbleLimit?.text = "/$limit"
                     if (!isDetailsExpanded) {
-                        tvBubbleIcon?.text = "💬"
                         tvBubbleStatus?.visibility = View.GONE
-                        setBubbleCardBorder(Color.parseColor("#475569"))
-                        container.alpha = 0.4f
-                        mainHandler.postDelayed(hideHudRunnable, 1500L)
                     }
+                    setBubbleCardBorder(Color.parseColor("#475569"))
                 }
             }
         }
@@ -599,15 +621,11 @@ class ReelAccessibilityService : AccessibilityService() {
 
             setupBubbleTouchListener(root)
 
-            val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
-
             val isLeft = prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT
             val gravity = if (isLeft) (Gravity.TOP or Gravity.START) else (Gravity.TOP or Gravity.END)
+
+            // 1. Try TYPE_ACCESSIBILITY_OVERLAY first: works automatically without needing SYSTEM_ALERT_WINDOW!
+            var layoutType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
 
             val wmParams = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -622,9 +640,22 @@ class ReelAccessibilityService : AccessibilityService() {
                 y = dpToPx(prefs.bubbleYOffset.coerceIn(36, 250))
             }
 
-            hudLayoutParams = wmParams
-            windowManager?.addView(root, wmParams)
-            isHudAttached = true
+            try {
+                windowManager?.addView(root, wmParams)
+                hudLayoutParams = wmParams
+                isHudAttached = true
+            } catch (e: Exception) {
+                // 2. If OEM restricts accessibility overlay, fallback to TYPE_APPLICATION_OVERLAY
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    wmParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                } else {
+                    @Suppress("DEPRECATION")
+                    wmParams.type = WindowManager.LayoutParams.TYPE_PHONE
+                }
+                windowManager?.addView(root, wmParams)
+                hudLayoutParams = wmParams
+                isHudAttached = true
+            }
         } catch (e: Exception) {
             isHudAttached = false
         }
@@ -878,7 +909,7 @@ class ReelAccessibilityService : AccessibilityService() {
                     VibrationEffect.createOneShot(350, VibrationEffect.DEFAULT_AMPLITUDE)
                 )
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                val vibrator = getSystemService(Vibrator::class.java)
                 vibrator?.vibrate(
                     VibrationEffect.createOneShot(350, VibrationEffect.DEFAULT_AMPLITUDE)
                 )
