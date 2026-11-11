@@ -20,6 +20,8 @@ class PreferencesManager(context: Context) {
         private const val KEY_WATCH_THRESHOLD = "watch_threshold"
         private const val KEY_SHOW_OVERLAY = "show_overlay"
         private const val KEY_HAPTIC_ENABLED = "haptic_enabled"
+        private const val KEY_BUBBLE_CORNER = "bubble_corner"
+        private const val KEY_BUBBLE_Y_OFFSET = "bubble_y_offset"
 
         private const val KEY_SAVED_DATE = "saved_date"
         private const val KEY_COUNT_TOTAL = "count_total"
@@ -30,6 +32,9 @@ class PreferencesManager(context: Context) {
         const val DEFAULT_DAILY_LIMIT = 20
         const val DEFAULT_REMINDER_INTERVAL = 10
         const val DEFAULT_WATCH_THRESHOLD = 2.0f // seconds
+
+        const val CORNER_TOP_RIGHT = "TOP_RIGHT"
+        const val CORNER_TOP_LEFT = "TOP_LEFT"
     }
 
     private fun getTodayDateString(): String {
@@ -81,6 +86,14 @@ class PreferencesManager(context: Context) {
     var hapticFeedbackEnabled: Boolean
         get() = prefs.getBoolean(KEY_HAPTIC_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_HAPTIC_ENABLED, value).apply()
+
+    var bubbleCorner: String
+        get() = prefs.getString(KEY_BUBBLE_CORNER, CORNER_TOP_RIGHT) ?: CORNER_TOP_RIGHT
+        set(value) = prefs.edit().putString(KEY_BUBBLE_CORNER, value).apply()
+
+    var bubbleYOffset: Int
+        get() = prefs.getInt(KEY_BUBBLE_Y_OFFSET, 60)
+        set(value) = prefs.edit().putInt(KEY_BUBBLE_Y_OFFSET, value).apply()
 
     fun getTotalWatched(): Int {
         checkAndResetIfNewDay()

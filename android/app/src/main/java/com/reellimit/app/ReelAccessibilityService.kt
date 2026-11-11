@@ -14,15 +14,20 @@ import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
+import java.util.ArrayDeque
 import java.util.Locale
 
 class ReelAccessibilityService : AccessibilityService() {
@@ -41,11 +46,28 @@ class ReelAccessibilityService : AccessibilityService() {
     private var videoWatchStartTime: Long = 0L
     private var activePackageName: String? = null
 
-    // Floating HUD Overlay
+    // Floating Bubble Overlay
     private var windowManager: WindowManager? = null
     private var hudContainer: FrameLayout? = null
-    private var hudTextView: TextView? = null
+    private var bubbleCard: LinearLayout? = null
+    private var tvBubbleIcon: TextView? = null
+    private var tvBubbleCount: TextView? = null
+    private var tvBubbleLimit: TextView? = null
+    private var tvBubbleStatus: TextView? = null
+    private var tvBubblePlusOne: TextView? = null
+    private var hudLayoutParams: WindowManager.LayoutParams? = null
     private var isHudAttached = false
+    private var isDetailsExpanded = false
+
+    private val collapseDetailsRunnable = Runnable {
+        isDetailsExpanded = false
+        tvBubbleStatus?.visibility = View.GONE
+        tvBubbleIcon?.text = "🎬"
+    }
+
+    private val hideHudRunnable = Runnable {
+        hudContainer?.visibility = View.GONE
+    }
 
     // Periodic check ticker (runs every 250ms when monitored app is open)
     private val tickerRunnable = object : Runnable {
@@ -133,7 +155,7 @@ class ReelAccessibilityService : AccessibilityService() {
                 isLockedOnCountedVideo = false
                 currentVideoSignature = null
                 videoWatchStartTime = 0L
-                updateFloatingHud("🔄 Swiped", HudStatus.TRANSITION)
+                updateFloatingHud(HudStatus.TRANSITION)
             }
         }
 
@@ -181,21 +203,14 @@ class ReelAccessibilityService : AccessibilityService() {
         if (signature == null) {
             videoWatchStartTime = 0L
             currentVideoSignature = null
-            // HUD feedback for chat / non-video screens
-            when (platform) {
-                "snapchat" -> updateFloatingHud("💬 Chat / Stories (Paused)", HudStatus.PAUSED)
-                "instagram" -> updateFloatingHud("🏠 Feed / DMs (Paused)", HudStatus.PAUSED)
-                "youtube" -> updateFloatingHud("▶ Watching Video (Paused)", HudStatus.PAUSED)
-            }
+            updateFloatingHud(HudStatus.PAUSED)
             return
         }
 
         // --- CASE B: Video is ALREADY COUNTED & LOCKED ---
         // Prevents counting a single 30-second reel 20 times!
         if (isLockedOnCountedVideo && currentVideoSignature == signature) {
-            val total = prefs.getTotalWatched()
-            val limit = prefs.dailyLimit
-            updateFloatingHud("🌿 $total/$limit • Counted (Locked)", HudStatus.LOCKED)
+            updateFloatingHud(HudStatus.LOCKED)
             return
         }
 
@@ -210,13 +225,10 @@ class ReelAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
         val elapsedSec = (now - videoWatchStartTime) / 1000f
         val thresholdSec = prefs.watchThresholdSeconds
-        val total = prefs.getTotalWatched()
-        val limit = prefs.dailyLimit
 
         if (elapsedSec < thresholdSec) {
             // Still watching, accumulating time towards verification
-            val formatted = String.format(Locale.US, "%.1fs/%.1fs", elapsedSec, thresholdSec)
-            updateFloatingHud("⏱️ $total/$limit • $formatted", HudStatus.WATCHING)
+            updateFloatingHud(HudStatus.WATCHING, elapsedSec, thresholdSec)
         } else {
             // Watch threshold fulfilled! Increment count exactly ONCE!
             isLockedOnCountedVideo = true
@@ -226,7 +238,7 @@ class ReelAccessibilityService : AccessibilityService() {
             triggerHapticTick()
 
             // Update HUD
-            updateFloatingHud("✅ $newTotal/$limit • +1 Counted! 🌿", HudStatus.COUNTED)
+            updateFloatingHud(HudStatus.COUNTED)
 
             // Check milestone (every 10 reels)
             if (newTotal > 0 && newTotal % prefs.reminderInterval == 0) {
@@ -443,7 +455,7 @@ class ReelAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // FLOATING HUD OVERLAY
+    // FLOATING REEL COUNTING BUBBLE
     // ==========================================
     enum class HudStatus {
         WATCHING,
@@ -453,7 +465,11 @@ class ReelAccessibilityService : AccessibilityService() {
         PAUSED
     }
 
-    private fun updateFloatingHud(message: String, status: HudStatus) {
+    private fun updateFloatingHud(
+        status: HudStatus,
+        elapsedSec: Float = 0f,
+        thresholdSec: Float = 0f
+    ) {
         if (!prefs.showFloatingOverlay) {
             hideFloatingHud()
             return
@@ -465,63 +481,123 @@ class ReelAccessibilityService : AccessibilityService() {
 
         mainHandler.post {
             ensureFloatingHudCreated()
-            val tv = hudTextView ?: return@post
+            val container = hudContainer ?: return@post
 
-            tv.text = message
-            val bg = tv.background as? GradientDrawable
-            if (bg != null) {
-                when (status) {
-                    HudStatus.WATCHING -> {
-                        bg.setColor(Color.parseColor("#E60F172A")) // Slate dark
-                        bg.setStroke(dpToPx(1), Color.parseColor("#38BDF8")) // Cyan pulse
+            val total = prefs.getTotalWatched()
+            val limit = prefs.dailyLimit
+
+            mainHandler.removeCallbacks(hideHudRunnable)
+
+            when (status) {
+                HudStatus.WATCHING -> {
+                    container.visibility = View.VISIBLE
+                    container.alpha = 1.0f
+                    tvBubbleIcon?.text = "⏱️"
+                    tvBubbleCount?.text = "$total"
+                    tvBubbleLimit?.text = "/$limit"
+
+                    if (!isDetailsExpanded) {
+                        tvBubbleStatus?.visibility = View.VISIBLE
+                        tvBubbleStatus?.setTextColor(Color.parseColor("#38BDF8"))
+                        tvBubbleStatus?.text = String.format(Locale.US, "%.1fs", elapsedSec)
                     }
-                    HudStatus.COUNTED -> {
-                        bg.setColor(Color.parseColor("#E6064E3B")) // Emerald green
-                        bg.setStroke(dpToPx(1), Color.parseColor("#34D399"))
+                    setBubbleCardBorder(Color.parseColor("#38BDF8")) // Sky blue pulse
+                }
+
+                HudStatus.COUNTED -> {
+                    container.visibility = View.VISIBLE
+                    container.alpha = 1.0f
+                    tvBubbleIcon?.text = "✅"
+                    tvBubbleCount?.text = "$total"
+                    tvBubbleLimit?.text = "/$limit"
+                    if (!isDetailsExpanded) {
+                        tvBubbleStatus?.visibility = View.GONE
                     }
-                    HudStatus.LOCKED -> {
-                        bg.setColor(Color.parseColor("#E61E293B")) // Muted dark
-                        bg.setStroke(dpToPx(1), Color.parseColor("#10B981"))
+                    setBubbleCardBorder(Color.parseColor("#34D399")) // Bright emerald
+
+                    // Animate "+1" pop badge
+                    tvBubblePlusOne?.apply {
+                        visibility = View.VISIBLE
+                        alpha = 1.0f
+                        translationY = 0f
+                        animate()
+                            .translationY(-dpToPx(16).toFloat())
+                            .alpha(0f)
+                            .setDuration(1000)
+                            .withEndAction { visibility = View.GONE }
+                            .start()
                     }
-                    HudStatus.TRANSITION -> {
-                        bg.setColor(Color.parseColor("#E61E293B"))
-                        bg.setStroke(dpToPx(1), Color.parseColor("#F59E0B")) // Amber
+
+                    // Gentle pulse animation on bubble
+                    bubbleCard?.animate()
+                        ?.scaleX(1.18f)?.scaleY(1.18f)
+                        ?.setDuration(130)
+                        ?.withEndAction {
+                            bubbleCard?.animate()?.scaleX(1.0f)?.scaleY(1.0f)?.setDuration(130)?.start()
+                        }?.start()
+                }
+
+                HudStatus.LOCKED -> {
+                    container.visibility = View.VISIBLE
+                    container.alpha = 0.85f // sleek, unobtrusive
+                    tvBubbleIcon?.text = "🎬"
+                    tvBubbleCount?.text = "$total"
+                    tvBubbleLimit?.text = "/$limit"
+                    if (!isDetailsExpanded) {
+                        tvBubbleStatus?.visibility = View.GONE
                     }
-                    HudStatus.PAUSED -> {
-                        bg.setColor(Color.parseColor("#E60F172A"))
-                        bg.setStroke(dpToPx(1), Color.parseColor("#475569"))
+                    setBubbleCardBorder(Color.parseColor("#10B981")) // Emerald border
+                }
+
+                HudStatus.TRANSITION -> {
+                    container.visibility = View.VISIBLE
+                    container.alpha = 0.9f
+                    tvBubbleIcon?.text = "🔄"
+                    if (!isDetailsExpanded) {
+                        tvBubbleStatus?.visibility = View.GONE
+                    }
+                    setBubbleCardBorder(Color.parseColor("#F59E0B")) // Amber
+                }
+
+                HudStatus.PAUSED -> {
+                    // Non-reel screen (Chat, DM, Stories, Home):
+                    // Dim gently and hide after 1.5 seconds so chat screens stay completely unobstructed!
+                    if (!isDetailsExpanded) {
+                        tvBubbleIcon?.text = "💬"
+                        tvBubbleStatus?.visibility = View.GONE
+                        setBubbleCardBorder(Color.parseColor("#475569"))
+                        container.alpha = 0.4f
+                        mainHandler.postDelayed(hideHudRunnable, 1500L)
                     }
                 }
             }
-
-            hudContainer?.visibility = View.VISIBLE
         }
     }
 
+    private fun setBubbleCardBorder(strokeColor: Int) {
+        val bg = bubbleCard?.background as? GradientDrawable
+        bg?.setStroke(dpToPx(1) + 1, strokeColor)
+    }
+
     private fun ensureFloatingHudCreated() {
-        if (hudContainer != null && isHudAttached) return
+        if (hudContainer != null && isHudAttached) {
+            syncBubbleCornerGravity()
+            return
+        }
 
         try {
-            val container = FrameLayout(this)
-            val textView = TextView(this).apply {
-                textSize = 11.5f
-                setTextColor(Color.WHITE)
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6))
-                val shape = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dpToPx(16).toFloat()
-                    setColor(Color.parseColor("#E60F172A"))
-                    setStroke(dpToPx(1), Color.parseColor("#334155"))
-                }
-                background = shape
-            }
+            val inflater = LayoutInflater.from(this)
+            val root = inflater.inflate(R.layout.view_reel_bubble, null) as FrameLayout
 
-            val frameParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            )
-            container.addView(textView, frameParams)
+            hudContainer = root
+            bubbleCard = root.findViewById(R.id.bubbleCard)
+            tvBubbleIcon = root.findViewById(R.id.tvBubbleIcon)
+            tvBubbleCount = root.findViewById(R.id.tvBubbleCount)
+            tvBubbleLimit = root.findViewById(R.id.tvBubbleLimit)
+            tvBubbleStatus = root.findViewById(R.id.tvBubbleStatus)
+            tvBubblePlusOne = root.findViewById(R.id.tvBubblePlusOne)
+
+            setupBubbleTouchListener(root)
 
             val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -530,26 +606,156 @@ class ReelAccessibilityService : AccessibilityService() {
                 WindowManager.LayoutParams.TYPE_PHONE
             }
 
+            val isLeft = prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT
+            val gravity = if (isLeft) (Gravity.TOP or Gravity.START) else (Gravity.TOP or Gravity.END)
+
             val wmParams = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
             ).apply {
-                gravity = Gravity.TOP or Gravity.END
-                x = dpToPx(16)
-                y = dpToPx(48) // Safe position below status bar
+                this.gravity = gravity
+                x = dpToPx(12)
+                y = dpToPx(prefs.bubbleYOffset.coerceIn(36, 250))
             }
 
-            windowManager?.addView(container, wmParams)
-            hudContainer = container
-            hudTextView = textView
+            hudLayoutParams = wmParams
+            windowManager?.addView(root, wmParams)
             isHudAttached = true
         } catch (e: Exception) {
             isHudAttached = false
+        }
+    }
+
+    private fun syncBubbleCornerGravity() {
+        val params = hudLayoutParams ?: return
+        val isLeft = prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT
+        val targetGravity = if (isLeft) (Gravity.TOP or Gravity.START) else (Gravity.TOP or Gravity.END)
+
+        if (params.gravity != targetGravity) {
+            params.gravity = targetGravity
+            params.x = dpToPx(12)
+            params.y = dpToPx(prefs.bubbleYOffset.coerceIn(36, 250))
+            try {
+                windowManager?.updateViewLayout(hudContainer, params)
+            } catch (e: Exception) {}
+        }
+    }
+
+    private fun setupBubbleTouchListener(root: FrameLayout) {
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+        var isDragging = false
+        var touchDownTime = 0L
+
+        root.setOnTouchListener { v, event ->
+            val wm = windowManager ?: return@setOnTouchListener false
+            val params = hudLayoutParams ?: return@setOnTouchListener false
+
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    isDragging = false
+                    touchDownTime = System.currentTimeMillis()
+                    true
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val deltaX = event.rawX - initialTouchX
+                    val deltaY = event.rawY - initialTouchY
+
+                    if (!isDragging && (Math.abs(deltaX) > dpToPx(6) || Math.abs(deltaY) > dpToPx(6))) {
+                        isDragging = true
+                        bubbleCard?.animate()?.scaleX(1.08f)?.scaleY(1.08f)?.setDuration(80)?.start()
+                    }
+
+                    if (isDragging) {
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        val screenHeight = resources.displayMetrics.heightPixels
+
+                        if (params.gravity and Gravity.END == Gravity.END) {
+                            params.x = (initialX - deltaX).toInt().coerceIn(dpToPx(4), screenWidth - dpToPx(60))
+                        } else {
+                            params.x = (initialX + deltaX).toInt().coerceIn(dpToPx(4), screenWidth - dpToPx(60))
+                        }
+                        params.y = (initialY + deltaY).toInt().coerceIn(dpToPx(24), screenHeight - dpToPx(80))
+
+                        try {
+                            wm.updateViewLayout(hudContainer, params)
+                        } catch (e: Exception) {}
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    bubbleCard?.animate()?.scaleX(1.0f)?.scaleY(1.0f)?.setDuration(100)?.start()
+                    val clickDuration = System.currentTimeMillis() - touchDownTime
+
+                    if (!isDragging && clickDuration < 350) {
+                        // Quick tap -> toggle expanded breakdown stats!
+                        toggleBubbleStats()
+                    } else if (isDragging) {
+                        // Dock/snap smoothly to nearest corner (Top Left or Top Right)
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        val snapToLeft = event.rawX < screenWidth / 2
+                        snapBubbleToCorner(snapToLeft, params.y)
+                    }
+                    true
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun snapBubbleToCorner(snapToLeft: Boolean, targetY: Int) {
+        val wm = windowManager ?: return
+        val params = hudLayoutParams ?: return
+
+        val newCorner = if (snapToLeft) PreferencesManager.CORNER_TOP_LEFT else PreferencesManager.CORNER_TOP_RIGHT
+        prefs.bubbleCorner = newCorner
+        prefs.bubbleYOffset = pxToDp(targetY)
+
+        params.gravity = if (snapToLeft) (Gravity.TOP or Gravity.START) else (Gravity.TOP or Gravity.END)
+        params.x = dpToPx(12)
+        params.y = targetY.coerceIn(dpToPx(36), resources.displayMetrics.heightPixels - dpToPx(100))
+
+        try {
+            wm.updateViewLayout(hudContainer, params)
+        } catch (e: Exception) {}
+    }
+
+    private fun toggleBubbleStats() {
+        isDetailsExpanded = !isDetailsExpanded
+        mainHandler.removeCallbacks(collapseDetailsRunnable)
+
+        if (isDetailsExpanded) {
+            val total = prefs.getTotalWatched()
+            val limit = prefs.dailyLimit
+            val y = prefs.getYoutubeWatched()
+            val i = prefs.getInstagramWatched()
+            val s = prefs.getSnapchatWatched()
+
+            tvBubbleIcon?.text = "📊"
+            tvBubbleCount?.text = "$total"
+            tvBubbleLimit?.text = "/$limit"
+            tvBubbleStatus?.visibility = View.VISIBLE
+            tvBubbleStatus?.setTextColor(Color.parseColor("#38BDF8"))
+            tvBubbleStatus?.text = "▶$y 📷$i 👻$s"
+
+            // Auto-collapse after 3.5 seconds
+            mainHandler.postDelayed(collapseDetailsRunnable, 3500L)
+        } else {
+            tvBubbleStatus?.visibility = View.GONE
+            tvBubbleIcon?.text = "🎬"
         }
     }
 
@@ -569,7 +775,13 @@ class ReelAccessibilityService : AccessibilityService() {
                 // Ignore
             } finally {
                 hudContainer = null
-                hudTextView = null
+                bubbleCard = null
+                tvBubbleIcon = null
+                tvBubbleCount = null
+                tvBubbleLimit = null
+                tvBubbleStatus = null
+                tvBubblePlusOne = null
+                hudLayoutParams = null
                 isHudAttached = false
             }
         }
@@ -577,6 +789,11 @@ class ReelAccessibilityService : AccessibilityService() {
 
     private fun dpToPx(dp: Int): Int {
         return (dp * resources.displayMetrics.density).toInt()
+    }
+
+    private fun pxToDp(px: Int): Int {
+        val density = resources.displayMetrics.density
+        return if (density > 0) (px / density).toInt() else px
     }
 
     // ==========================================
@@ -655,8 +872,13 @@ class ReelAccessibilityService : AccessibilityService() {
 
     private fun triggerStrongVibration() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val vibrator = getSystemService(Vibrator::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator.vibrate(
+                    VibrationEffect.createOneShot(350, VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 vibrator?.vibrate(
                     VibrationEffect.createOneShot(350, VibrationEffect.DEFAULT_AMPLITUDE)
                 )

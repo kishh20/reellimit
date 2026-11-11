@@ -70,7 +70,22 @@
 
     const pill = document.createElement('div');
     pill.className = 'reellimit-mini-pill';
-    pill.title = 'ReelLimit - Click to check details';
+    pill.title = 'ReelLimit - Click for stats, Double-click to switch corner';
+
+    chrome.storage.local.get(['bubbleCorner'], (res) => {
+      if (res.bubbleCorner === 'top-left') {
+        pillContainer.classList.add('top-left');
+      } else {
+        pillContainer.classList.add('top-right');
+      }
+    });
+
+    pill.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const isLeft = pillContainer.classList.toggle('top-left');
+      pillContainer.classList.toggle('top-right', !isLeft);
+      chrome.storage.local.set({ bubbleCorner: isLeft ? 'top-left' : 'top-right' });
+    });
 
     pillDot = document.createElement('span');
     pillDot.className = 'reellimit-pill-dot';

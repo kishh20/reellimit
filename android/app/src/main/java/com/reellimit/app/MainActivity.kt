@@ -48,6 +48,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchSnapchat: SwitchMaterial
 
     private lateinit var switchFloatingOverlay: SwitchMaterial
+    private lateinit var layoutBubbleCorner: View
+    private lateinit var toggleBubbleCorner: com.google.android.material.button.MaterialButtonToggleGroup
+    private lateinit var btnCornerLeft: com.google.android.material.button.MaterialButton
+    private lateinit var btnCornerRight: com.google.android.material.button.MaterialButton
     private lateinit var switchHapticTick: SwitchMaterial
 
     private lateinit var btnResetToday: Button
@@ -90,6 +94,10 @@ class MainActivity : AppCompatActivity() {
         switchSnapchat = findViewById(R.id.switchSnapchat)
 
         switchFloatingOverlay = findViewById(R.id.switchFloatingOverlay)
+        layoutBubbleCorner = findViewById(R.id.layoutBubbleCorner)
+        toggleBubbleCorner = findViewById(R.id.toggleBubbleCorner)
+        btnCornerLeft = findViewById(R.id.btnCornerLeft)
+        btnCornerRight = findViewById(R.id.btnCornerRight)
         switchHapticTick = findViewById(R.id.switchHapticTick)
 
         btnResetToday = findViewById(R.id.btnResetToday)
@@ -108,6 +116,13 @@ class MainActivity : AppCompatActivity() {
         switchSnapchat.isChecked = prefs.isSnapchatEnabled
 
         switchFloatingOverlay.isChecked = prefs.showFloatingOverlay
+        layoutBubbleCorner.visibility = if (prefs.showFloatingOverlay) View.VISIBLE else View.GONE
+        if (prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT) {
+            toggleBubbleCorner.check(R.id.btnCornerLeft)
+        } else {
+            toggleBubbleCorner.check(R.id.btnCornerRight)
+        }
+
         switchHapticTick.isChecked = prefs.hapticFeedbackEnabled
     }
 
@@ -147,13 +162,26 @@ class MainActivity : AppCompatActivity() {
 
         switchFloatingOverlay.setOnCheckedChangeListener { _, isChecked ->
             prefs.showFloatingOverlay = isChecked
+            layoutBubbleCorner.visibility = if (isChecked) View.VISIBLE else View.GONE
             if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                 val intent = Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:$packageName")
                 )
                 startActivity(intent)
-                Toast.makeText(this, "Enable 'Display over other apps' to show live counter HUD", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Enable 'Display over other apps' to show the reel counting bubble", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        toggleBubbleCorner.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                if (checkedId == R.id.btnCornerLeft) {
+                    prefs.bubbleCorner = PreferencesManager.CORNER_TOP_LEFT
+                    Toast.makeText(this, "Reel bubble set to Top Left corner", Toast.LENGTH_SHORT).show()
+                } else if (checkedId == R.id.btnCornerRight) {
+                    prefs.bubbleCorner = PreferencesManager.CORNER_TOP_RIGHT
+                    Toast.makeText(this, "Reel bubble set to Top Right corner", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -192,6 +220,12 @@ class MainActivity : AppCompatActivity() {
         tvCountYoutube.text = prefs.getYoutubeWatched().toString()
         tvCountInstagram.text = prefs.getInstagramWatched().toString()
         tvCountSnapchat.text = prefs.getSnapchatWatched().toString()
+
+        if (prefs.bubbleCorner == PreferencesManager.CORNER_TOP_LEFT) {
+            toggleBubbleCorner.check(R.id.btnCornerLeft)
+        } else {
+            toggleBubbleCorner.check(R.id.btnCornerRight)
+        }
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
