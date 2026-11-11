@@ -86,7 +86,6 @@ class ReelAccessibilityService : AccessibilityService() {
         const val PACKAGE_YOUTUBE = "com.google.android.youtube"
         const val PACKAGE_INSTAGRAM = "com.instagram.android"
         const val PACKAGE_SNAPCHAT = "com.snapchat.android"
-        const val PACKAGE_REEL_LIMIT = "com.reellimit.app"
 
         const val ACTION_TEST_BUBBLE = "com.reellimit.app.ACTION_TEST_BUBBLE"
         const val ACTION_SHOW_BUBBLE = "com.reellimit.app.ACTION_SHOW_BUBBLE"
@@ -105,10 +104,10 @@ class ReelAccessibilityService : AccessibilityService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_TEST_BUBBLE || intent?.action == ACTION_SHOW_BUBBLE) {
             mainHandler.post {
-                ensureFloatingHudCreated()
-                updateFloatingHud(HudStatus.LOCKED)
-                hudContainer?.visibility = View.VISIBLE
-                hudContainer?.alpha = 1.0f
+                showFloatingBubble()
+                // Auto-hide preview after 6 seconds so it doesn't get stuck on screen
+                mainHandler.removeCallbacks(hideHudRunnable)
+                mainHandler.postDelayed(hideHudRunnable, 6000L)
             }
         }
         return super.onStartCommand(intent, flags, startId)
@@ -131,7 +130,13 @@ class ReelAccessibilityService : AccessibilityService() {
         if (event == null) return
         val packageName = event.packageName?.toString() ?: return
 
-        // 1. If daily limit is already reached, immediately block and close monitored apps
+        // 1. Ignore system overlays, notification shade, status bar, and keyboards
+        // so they don't falsely hide the bubble while in Instagram/YouTube/Snapchat
+        if (isSystemOrInputPackage(packageName)) {
+            return
+        }
+
+        // 2. If daily limit is already reached, immediately block and close monitored apps
         if (prefs.isLimitReached() && isMonitoredPackage(packageName)) {
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 enforceAppClose("Daily limit of ${prefs.dailyLimit} reels reached!")
@@ -139,10 +144,11 @@ class ReelAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. Monitored package boundary handling
+        // 3. Monitored package boundary handling:
+        // If user is NOT in a monitored app (e.g. Launcher/Homescreen, WhatsApp, Settings, ReelLimit)
         if (!isMonitoredPackage(packageName)) {
             if (activePackageName != null) {
-                // User navigated away from monitored app
+                // User navigated away to Homescreen or another app
                 activePackageName = null
                 activePlatform = null
                 currentVideoSignature = null
@@ -154,20 +160,18 @@ class ReelAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 3. User entered or is active in a monitored app
+        // 4. User entered or is active in a monitored app (Instagram, YouTube, Snapchat)
         if (activePackageName != packageName) {
             activePackageName = packageName
             activePlatform = getPlatformFromPackage(packageName)
             mainHandler.removeCallbacks(tickerRunnable)
             mainHandler.post(tickerRunnable)
-            // Immediately display the bubble when user opens YouTube, Instagram, Snapchat, or ReelLimit!
-            updateFloatingHud(HudStatus.LOCKED)
+            // Immediately pop the bubble into the corner when opening Instagram, YouTube, or Snapchat!
+            showFloatingBubble()
         }
 
-        // 4. SCROLL EVENT DETECTION:
-        // A physical scroll gesture occurred (user swiping up/down to next reel)
+        // 5. SCROLL EVENT DETECTION:
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
-            // Unlock state machine so next video can be evaluated
             if (isLockedOnCountedVideo) {
                 isLockedOnCountedVideo = false
                 currentVideoSignature = null
@@ -176,31 +180,40 @@ class ReelAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 5. Run immediate inspection on state changes
+        // 6. Run immediate inspection on state changes
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             tickActiveApp()
         }
     }
 
+    private fun isSystemOrInputPackage(packageName: String): Boolean {
+        val lower = packageName.lowercase()
+        return lower == "com.android.systemui" ||
+                lower == "android" ||
+                lower == "com.google.android.gms" ||
+                lower.contains("inputmethod") ||
+                lower.contains("keyboard") ||
+                lower.contains("ime") ||
+                lower.contains("permissioncontroller")
+    }
+
     private fun getPlatformFromPackage(packageName: String): String {
-        return when (packageName) {
-            PACKAGE_YOUTUBE -> "youtube"
-            PACKAGE_INSTAGRAM -> "instagram"
-            PACKAGE_SNAPCHAT -> "snapchat"
-            PACKAGE_REEL_LIMIT -> "reellimit"
+        val lower = packageName.lowercase()
+        return when {
+            lower.contains("youtube") -> "youtube"
+            lower.contains("instagram") -> "instagram"
+            lower.contains("snapchat") -> "snapchat"
             else -> ""
         }
     }
 
     private fun isMonitoredPackage(packageName: String): Boolean {
-        return when (packageName) {
-            PACKAGE_YOUTUBE -> prefs.isYoutubeEnabled
-            PACKAGE_INSTAGRAM -> prefs.isInstagramEnabled
-            PACKAGE_SNAPCHAT -> prefs.isSnapchatEnabled
-            PACKAGE_REEL_LIMIT -> true
-            else -> false
-        }
+        val lower = packageName.lowercase()
+        if (lower.contains("youtube") && prefs.isYoutubeEnabled) return true
+        if (lower.contains("instagram") && prefs.isInstagramEnabled) return true
+        if (lower.contains("snapchat") && prefs.isSnapchatEnabled) return true
+        return false
     }
 
     // ==========================================
@@ -209,12 +222,6 @@ class ReelAccessibilityService : AccessibilityService() {
     private fun tickActiveApp() {
         val rootNode = rootInActiveWindow ?: return
         val platform = activePlatform ?: return
-
-        // In ReelLimit app: keep bubble visible in preview mode
-        if (platform == "reellimit") {
-            updateFloatingHud(HudStatus.LOCKED)
-            return
-        }
 
         // Check if user is currently watching short-form video or elsewhere in the app
         val signature = when (platform) {
@@ -228,7 +235,7 @@ class ReelAccessibilityService : AccessibilityService() {
         if (signature == null) {
             videoWatchStartTime = 0L
             currentVideoSignature = null
-            // DO NOT HIDE! Keep bubble visible in calm idle state so user always knows their current count!
+            // Keep bubble visible in calm idle state so user always knows their current count!
             updateFloatingHud(HudStatus.PAUSED)
             return
         }
@@ -492,6 +499,16 @@ class ReelAccessibilityService : AccessibilityService() {
         PAUSED
     }
 
+    private fun showFloatingBubble() {
+        if (!prefs.showFloatingOverlay) return
+        mainHandler.post {
+            ensureFloatingHudCreated()
+            hudContainer?.visibility = View.VISIBLE
+            hudContainer?.alpha = 1.0f
+            updateFloatingHud(HudStatus.LOCKED)
+        }
+    }
+
     private fun updateFloatingHud(
         status: HudStatus,
         elapsedSec: Float = 0f,
@@ -560,7 +577,6 @@ class ReelAccessibilityService : AccessibilityService() {
                 }
 
                 HudStatus.LOCKED -> {
-                    // Counted or active video:
                     container.alpha = 0.90f
                     tvBubbleIcon?.text = "🎬"
                     tvBubbleCount?.text = "$total"
@@ -582,7 +598,6 @@ class ReelAccessibilityService : AccessibilityService() {
 
                 HudStatus.PAUSED -> {
                     // In-app browsing (Home feed, Explore, Profile):
-                    // Keep bubble visible in corner with calm, muted border so user always knows their progress
                     container.alpha = 0.75f
                     tvBubbleIcon?.text = "🎬"
                     tvBubbleCount?.text = "$total"
