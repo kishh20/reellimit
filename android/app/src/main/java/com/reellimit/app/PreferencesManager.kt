@@ -31,7 +31,7 @@ class PreferencesManager(context: Context) {
 
         const val DEFAULT_DAILY_LIMIT = 20
         const val DEFAULT_REMINDER_INTERVAL = 10
-        const val DEFAULT_WATCH_THRESHOLD = 2.0f // seconds
+        const val DEFAULT_WATCH_THRESHOLD = 1.2f // seconds (fast & responsive)
 
         const val CORNER_TOP_RIGHT = "TOP_RIGHT"
         const val CORNER_TOP_LEFT = "TOP_LEFT"

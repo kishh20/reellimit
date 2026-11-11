@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
         sliderDailyLimit.value = prefs.dailyLimit.toFloat()
         tvDailyLimitValue.text = "${prefs.dailyLimit} Reels"
 
-        val threshold = prefs.watchThresholdSeconds
+        val threshold = prefs.watchThresholdSeconds.coerceIn(0.6f, 3.0f)
         sliderWatchThreshold.value = threshold
         tvWatchThresholdValue.text = "${threshold}s"
 

@@ -378,7 +378,7 @@
                         android:id="@+id/tvWatchThresholdValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="2.0 Seconds"
+                        android:text="1.2 Seconds"
                         android:textColor="@color/accent"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -388,10 +388,10 @@
                     android:id="@+id/sliderWatchThreshold"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:stepSize="0.5"
-                    android:value="2.0"
-                    android:valueFrom="1.0"
-                    android:valueTo="5.0" />
+                    android:stepSize="0.2"
+                    android:value="1.2"
+                    android:valueFrom="0.6"
+                    android:valueTo="3.0" />
 
                 <!-- Monitored Apps Toggles -->
                 <TextView
