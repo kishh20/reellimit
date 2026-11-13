@@ -2,8 +2,8 @@
 
 A dual-platform digital wellbeing solution that monitors short-form video consumption across **Instagram Reels**, **YouTube Shorts**, and **Snapchat Spotlight**, delivers mindful reminder alerts every 10 videos, and automatically closes the application when your daily watch limit is reached.
 
-[![Download ReelLimit APK](https://img.shields.io/badge/Download-ReelLimit.apk-blue?style=for-the-badge&logo=android)](https://github.com/kishh20/reellimit/releases/download/v1.0.0/ReelLimit.apk)
-[![GitHub Release](https://img.shields.io/github/v/release/kishh20/reellimit?style=for-the-badge)](https://github.com/kishh20/reellimit/releases/tag/v1.0.0)
+[![Download ReelLimit APK](https://img.shields.io/badge/Download-ReelLimit.apk-blue?style=for-the-badge&logo=android)](https://github.com/kishh20/reellimit/releases/download/v1.0.7/ReelLimit.apk)
+[![GitHub Release](https://img.shields.io/github/v/release/kishh20/reellimit?style=for-the-badge)](https://github.com/kishh20/reellimit/releases/tag/v1.0.7)
 
 ---
 
@@ -73,5 +73,7 @@ flowchart TD
    When the daily threshold is met:
    - **Browser**: Instantly closes the tab or redirects to a full-screen dopamine-reset page equipped with a 4-7-8 breathing exercise.
    - **Android**: Calls `performGlobalAction(GLOBAL_ACTION_HOME)` to immediately minimize the native app and displays `LockOverlayActivity` to block reopening.
-4. **Privacy First:**
-   100% on-device storage. No analytics, tracking, or network calls.
+4. **Privacy & Banking Safety First:**
+   - **Zero Internet Permission (`INTERNET` permission is NOT present)**: All counts and preferences are strictly 100% on-device. No telemetry, no background calls.
+   - **100% Banking & UPI Compliant**: The Accessibility Service is explicitly whitelisted to target only YouTube, Instagram, and Snapchat. Banking, payment, and UPI apps (Google Pay, PhonePe, Paytm, BHIM, Cred, HDFC, SBI, etc.) are completely excluded.
+   - **Anti-Tapjacking Clean Windowing**: The floating bubble overlay is completely unmounted from the Android WindowManager whenever navigating outside monitored apps, leaving zero overlay presence.

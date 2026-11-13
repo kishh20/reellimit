@@ -2,7 +2,8 @@
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeViewScrolled|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagReportViewIds"
+    android:accessibilityFlags="flagDefault|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_desc"
-    android:notificationTimeout="20" />
+    android:notificationTimeout="20"
+    android:packageNames="com.google.android.youtube,com.instagram.android,com.snapchat.android,com.instagram.lite,app.revanced.android.youtube,com.vanced.android.youtube" />

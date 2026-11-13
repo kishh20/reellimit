@@ -72,7 +72,7 @@ class ReelAccessibilityService : AccessibilityService() {
         isLockedOnCountedVideo = false
         videoWatchStartTime = 0L
         mainHandler.removeCallbacks(tickerRunnable)
-        hudContainer?.visibility = View.GONE
+        removeFloatingHud()
     }
 
     // High-performance check ticker (runs every 100ms for instant, fluid count updates)
@@ -106,6 +106,24 @@ class ReelAccessibilityService : AccessibilityService() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         isServiceRunning = true
         createNotificationChannel()
+
+        // Restrict accessibility service scope exclusively to monitored video apps
+        // Crucial for banking & UPI security compliance (GPay, PhonePe, Paytm, BHIM, etc.)
+        try {
+            val info = serviceInfo ?: android.accessibilityservice.AccessibilityServiceInfo()
+            info.packageNames = arrayOf(
+                PACKAGE_YOUTUBE,
+                PACKAGE_INSTAGRAM,
+                PACKAGE_SNAPCHAT,
+                "com.instagram.lite",
+                "app.revanced.android.youtube",
+                "com.vanced.android.youtube"
+            )
+            info.flags = info.flags and android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS.inv()
+            serviceInfo = info
+        } catch (e: Exception) {
+            // Ignore if OEM restricts runtime serviceInfo mutation
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -310,6 +328,19 @@ class ReelAccessibilityService : AccessibilityService() {
     // ==========================================
     private fun tickActiveApp() {
         val rootNode = rootInActiveWindow ?: return
+        val currentPkg = rootNode.packageName?.toString()
+        if (currentPkg != null && !isMonitoredPackage(currentPkg) && !isSystemOrInputPackage(currentPkg)) {
+            // User switched to another application (e.g. UPI/banking app, home, browser)
+            removeFloatingHud()
+            activePackageName = null
+            activePlatform = null
+            currentVideoSignature = null
+            isLockedOnCountedVideo = false
+            videoWatchStartTime = 0L
+            mainHandler.removeCallbacks(tickerRunnable)
+            return
+        }
+
         val platform = activePlatform ?: return
 
         // Check if user is currently watching short-form video or elsewhere in the app
@@ -740,9 +771,7 @@ class ReelAccessibilityService : AccessibilityService() {
     }
 
     private fun hideFloatingHud() {
-        mainHandler.post {
-            hudContainer?.visibility = View.GONE
-        }
+        removeFloatingHud()
     }
 
     private fun removeFloatingHud() {
